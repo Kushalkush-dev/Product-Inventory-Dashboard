@@ -5,17 +5,21 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Header } from "@/components/layout/Header";
 import { ProtectedRoute } from "@/components/auth/ProtectedRoute";
 import { productApi } from "@/api/productApi";
-import { Product } from "@/types/product";
+import { Product, ProductCategory } from "@/types/product";
 import { ProductTable } from "@/components/products/ProductTable";
 import { ProductCards } from "@/components/products/ProductCards";
 import { Pagination } from "@/components/products/Pagination";
 import { SearchInput } from "@/components/products/SearchInput";
+import { CategoryFilter } from "@/components/products/CategoryFilter";
+import { SortControls } from "@/components/products/SortControls";
 import { TableSkeleton, CardsSkeleton } from "@/components/common/Skeletons";
 import { ErrorState, EmptyState } from "@/components/common/FeedbackStates";
 import {
   parseProductQueryParams,
   buildProductQueryString,
   AllowedLimit,
+  AllowedSortBy,
+  AllowedOrder,
   ProductQueryState,
 } from "@/utils/urlParams";
 import { calculateSkip } from "@/utils/pagination";
@@ -35,6 +39,8 @@ function ProductsContent() {
   const debouncedSearchTerm = useDebounce<string>(searchTerm, 400);
 
   const [products, setProducts] = useState<Product[]>([]);
+  const [categories, setCategories] = useState<ProductCategory[]>([]);
+  const [isLoadingCategories, setIsLoadingCategories] = useState<boolean>(true);
   const [total, setTotal] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRetrying, setIsRetrying] = useState<boolean>(false);
@@ -43,8 +49,31 @@ function ProductsContent() {
   // AbortController ref to cancel in-flight stale network requests
   const abortControllerRef = useRef<AbortController | null>(null);
 
-  // Request ID counter to guarantee stale-response protection (latest search always wins)
+  // Request ID counter to guarantee stale-response protection (latest request always wins)
   const requestIdRef = useRef<number>(0);
+
+  // Load categories once on mount
+  useEffect(() => {
+    let isMounted = true;
+    async function fetchCategories() {
+      try {
+        const cats = await productApi.getCategories();
+        if (isMounted) {
+          setCategories(cats);
+        }
+      } catch (e) {
+        console.error("Failed to load categories:", e);
+      } finally {
+        if (isMounted) {
+          setIsLoadingCategories(false);
+        }
+      }
+    }
+    fetchCategories();
+    return () => {
+      isMounted = false;
+    };
+  }, []);
 
   // Synchronize local search input if URL changes externally (e.g. Back/Forward)
   useEffect(() => {
@@ -87,6 +116,17 @@ function ProductsContent() {
   const handleSearchClear = () => {
     setSearchTerm("");
     updateQueryState({ search: "", page: 1 });
+  };
+
+  const handleCategorySelect = (selectedCat: string) => {
+    // Selecting category updates URL, clears any search term, and resets page to 1
+    setSearchTerm("");
+    updateQueryState({ category: selectedCat, search: "", page: 1 });
+  };
+
+  const handleSortChange = (newSortBy?: AllowedSortBy, newOrder?: AllowedOrder) => {
+    // Sorting updates URL and resets page to 1
+    updateQueryState({ sortBy: newSortBy, order: newOrder, page: 1 });
   };
 
   /**
@@ -189,20 +229,41 @@ function ProductsContent() {
         </Link>
       </div>
 
-      {/* Search & Filter Toolbar */}
-      <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-4 p-4 bg-white rounded-xl border border-slate-200 shadow-xs">
-        <SearchInput
-          value={searchTerm}
-          onChange={setSearchTerm}
-          onClear={handleSearchClear}
-          isLoading={isLoading && isSearchActive}
-        />
+      {/* Search, Category & Sorting Toolbar */}
+      <div className="flex flex-col gap-3 p-4 bg-white rounded-xl border border-slate-200 shadow-xs">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
+          <SearchInput
+            value={searchTerm}
+            onChange={setSearchTerm}
+            onClear={handleSearchClear}
+            isLoading={isLoading && isSearchActive}
+          />
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Category Filter */}
+            <CategoryFilter
+              categories={categories}
+              selectedCategory={queryState.category}
+              onSelectCategory={handleCategorySelect}
+              isLoading={isLoadingCategories}
+              disabled={isSearchActive}
+            />
+
+            {/* Sorting Controls */}
+            <SortControls
+              sortBy={queryState.sortBy}
+              order={queryState.order}
+              onSortChange={handleSortChange}
+              disabled={isLoading}
+            />
+          </div>
+        </div>
 
         {/* Search / Category limitation alert */}
         {isSearchActive && (
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200/60 text-xs text-amber-800">
             <Info className="w-4 h-4 shrink-0 text-amber-600" />
-            <span>Search is active. Category filters are temporarily disabled due to API limitations.</span>
+            <span>Search is active. Category filter is disabled because the API cannot filter by category and search simultaneously.</span>
           </div>
         )}
       </div>
@@ -230,6 +291,8 @@ function ProductsContent() {
           message={
             isSearchActive
               ? "We couldn't find any products matching your search term. Try adjusting your spelling or searching for another keyword."
+              : queryState.category !== "all"
+              ? `No products found in category "${queryState.category}".`
               : "No products match your current filters."
           }
           action={
@@ -239,6 +302,13 @@ function ProductsContent() {
                 className="mt-4 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition cursor-pointer"
               >
                 Clear Search
+              </button>
+            ) : queryState.category !== "all" ? (
+              <button
+                onClick={() => handleCategorySelect("all")}
+                className="mt-4 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition cursor-pointer"
+              >
+                Show All Categories
               </button>
             ) : undefined
           }
