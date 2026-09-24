@@ -54,7 +54,7 @@ export function ProductReviews({ reviews }: ProductReviewsProps) {
                   </div>
                   <span className="text-[11px] text-slate-400">{dateFormatted}</span>
                 </div>
-                <p className="text-sm text-slate-700 italic">"{rev.comment}"</p>
+                <p className="text-sm text-slate-700 italic">&quot;{rev.comment}&quot;</p>
               </div>
 
               <div className="flex items-center gap-2 pt-2 border-t border-slate-200/50">

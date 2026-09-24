@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { ArrowRight, Box, ShieldCheck, Zap } from "lucide-react";
+import { ArrowRight, Box, Zap } from "lucide-react";
 
 export default function Home() {
   return (
