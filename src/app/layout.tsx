@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Inter } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
+import { ProductMutationProvider } from "@/context/ProductMutationContext";
 
 const inter = Inter({
   subsets: ["latin"],
@@ -22,7 +23,9 @@ export default function RootLayout({
     <html lang="en" className={`${inter.variable} h-full antialiased`}>
       <body className="min-h-full flex flex-col font-sans bg-slate-50 text-slate-900">
         <AuthProvider>
-          {children}
+          <ProductMutationProvider>
+            {children}
+          </ProductMutationProvider>
         </AuthProvider>
       </body>
     </html>

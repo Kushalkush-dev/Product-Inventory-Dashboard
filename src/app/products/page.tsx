@@ -12,8 +12,10 @@ import { Pagination } from "@/components/products/Pagination";
 import { SearchInput } from "@/components/products/SearchInput";
 import { CategoryFilter } from "@/components/products/CategoryFilter";
 import { SortControls } from "@/components/products/SortControls";
+import { DeleteConfirmationDialog } from "@/components/products/DeleteConfirmationDialog";
 import { TableSkeleton, CardsSkeleton } from "@/components/common/Skeletons";
 import { ErrorState, EmptyState } from "@/components/common/FeedbackStates";
+import { useProductMutations } from "@/context/ProductMutationContext";
 import {
   parseProductQueryParams,
   buildProductQueryString,
@@ -34,17 +36,24 @@ function ProductsContent() {
   // Centralized URL state parsing
   const queryState: ProductQueryState = parseProductQueryParams(searchParams);
 
+  // Local mutation tracking context
+  const { addedProducts, mergeWithServerProducts, recordDelete } = useProductMutations();
+
   // Local immediate search input state for responsive keystrokes
   const [searchTerm, setSearchTerm] = useState<string>(queryState.search);
   const debouncedSearchTerm = useDebounce<string>(searchTerm, 400);
 
-  const [products, setProducts] = useState<Product[]>([]);
+  const [rawProducts, setRawProducts] = useState<Product[]>([]);
   const [categories, setCategories] = useState<ProductCategory[]>([]);
   const [isLoadingCategories, setIsLoadingCategories] = useState<boolean>(true);
   const [total, setTotal] = useState<number>(0);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [isRetrying, setIsRetrying] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+
+  // Delete modal state
+  const [productToDelete, setProductToDelete] = useState<Product | null>(null);
+  const [isDeleting, setIsDeleting] = useState<boolean>(false);
 
   // AbortController ref to cancel in-flight stale network requests
   const abortControllerRef = useRef<AbortController | null>(null);
@@ -99,7 +108,6 @@ function ProductsContent() {
       updateQueryState({
         search: debouncedSearchTerm,
         page: 1, // Search change resets page to 1
-        // Note: When search is active, category is cleared/disabled due to API limitation
         category: debouncedSearchTerm.trim() ? "all" : queryState.category,
       });
     }
@@ -119,32 +127,42 @@ function ProductsContent() {
   };
 
   const handleCategorySelect = (selectedCat: string) => {
-    // Selecting category updates URL, clears any search term, and resets page to 1
     setSearchTerm("");
     updateQueryState({ category: selectedCat, search: "", page: 1 });
   };
 
   const handleSortChange = (newSortBy?: AllowedSortBy, newOrder?: AllowedOrder) => {
-    // Sorting updates URL and resets page to 1
     updateQueryState({ sortBy: newSortBy, order: newOrder, page: 1 });
   };
 
+  const handleDeleteConfirm = async () => {
+    if (!productToDelete || isDeleting) return;
+
+    setIsDeleting(true);
+    try {
+      await productApi.deleteProduct(productToDelete.id);
+      recordDelete(productToDelete.id);
+      setProductToDelete(null);
+    } catch (e) {
+      console.error("Delete failed on API, still recording local deletion:", e);
+      recordDelete(productToDelete.id);
+      setProductToDelete(null);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
+
   /**
-   * Loads products with:
-   * 1. AbortController cancellation for previous in-flight requests.
-   * 2. Request identity sequence check (requestIdRef) to ensure delayed responses (e.g., &delay=2000)
-   *    can never overwrite newer responses.
+   * Loads products with AbortController cancellation and requestId sequence check.
    */
   const loadProducts = useCallback(
     async (isRetry = false) => {
-      // 1. Cancel previous in-flight request
       if (abortControllerRef.current) {
         abortControllerRef.current.abort();
       }
       const controller = new AbortController();
       abortControllerRef.current = controller;
 
-      // 2. Increment request identity counter
       const currentRequestId = ++requestIdRef.current;
 
       if (isRetry) {
@@ -168,12 +186,10 @@ function ProductsContent() {
           controller.signal
         );
 
-        // 3. Stale Response Guard: Only commit state if this request is still the latest one
         if (currentRequestId === requestIdRef.current) {
-          setProducts(data.products);
+          setRawProducts(data.products);
           setTotal(data.total);
 
-          // Normalize out-of-range page if server returns total less than current page offset
           const maxPages = Math.max(1, Math.ceil(data.total / queryState.limit));
           if (queryState.page > maxPages && data.total > 0) {
             updateQueryState({ page: maxPages });
@@ -181,7 +197,6 @@ function ProductsContent() {
         }
       } catch (err: unknown) {
         const error = err as Error;
-        // Ignore aborted requests; only set error for the latest active request
         if (
           currentRequestId === requestIdRef.current &&
           error.name !== "CanceledError" &&
@@ -208,6 +223,15 @@ function ProductsContent() {
     };
   }, [loadProducts]);
 
+  // Combine server products with local mutations (edits & deletions)
+  const mergedProducts = mergeWithServerProducts(rawProducts);
+
+  // If on page 1 without search or category filter, prepend local additions
+  const isDefaultView = queryState.page === 1 && !queryState.search && queryState.category === "all";
+  const displayedProducts = isDefaultView
+    ? [...addedProducts, ...mergedProducts.filter((p) => !addedProducts.some((a) => a.id === p.id))]
+    : mergedProducts;
+
   const isSearchActive = !!queryState.search.trim();
 
   return (
@@ -217,7 +241,7 @@ function ProductsContent() {
         <div>
           <h1 className="text-2xl font-bold tracking-tight text-slate-900">Products Inventory</h1>
           <p className="text-sm text-slate-500 mt-1">
-            Manage, filter, and track catalog items ({total} total products).
+            Manage, filter, and track catalog items ({total + addedProducts.length} total products).
           </p>
         </div>
         <Link
@@ -227,6 +251,14 @@ function ProductsContent() {
           <Plus className="w-4 h-4" />
           <span>Add New Product</span>
         </Link>
+      </div>
+
+      {/* Non-Persistent Mutation Info Banner */}
+      <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-100 border border-slate-200 text-xs text-slate-600">
+        <Info className="w-4 h-4 text-blue-600 shrink-0" />
+        <span>
+          <strong>Client-side simulation active:</strong> The DummyJSON API does not persistently commit CRUD operations to its remote database. Created, updated, and deleted products are synced into a client-side mutation store for this session.
+        </span>
       </div>
 
       {/* Search, Category & Sorting Toolbar */}
@@ -240,7 +272,6 @@ function ProductsContent() {
           />
 
           <div className="flex flex-wrap items-center gap-3">
-            {/* Category Filter */}
             <CategoryFilter
               categories={categories}
               selectedCategory={queryState.category}
@@ -249,7 +280,6 @@ function ProductsContent() {
               disabled={isSearchActive}
             />
 
-            {/* Sorting Controls */}
             <SortControls
               sortBy={queryState.sortBy}
               order={queryState.order}
@@ -259,7 +289,6 @@ function ProductsContent() {
           </div>
         </div>
 
-        {/* Search / Category limitation alert */}
         {isSearchActive && (
           <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200/60 text-xs text-amber-800">
             <Info className="w-4 h-4 shrink-0 text-amber-600" />
@@ -285,7 +314,7 @@ function ProductsContent() {
           onRetry={() => loadProducts(true)}
           isRetrying={isRetrying}
         />
-      ) : products.length === 0 ? (
+      ) : displayedProducts.length === 0 ? (
         <EmptyState
           title={isSearchActive ? `No results for "${queryState.search}"` : "No products found"}
           message={
@@ -315,17 +344,14 @@ function ProductsContent() {
         />
       ) : (
         <div className="space-y-4">
-          {/* Desktop Table View */}
           <div className="hidden md:block">
-            <ProductTable products={products} />
+            <ProductTable products={displayedProducts} onDeleteClick={setProductToDelete} />
           </div>
 
-          {/* Mobile Cards View */}
           <div className="block md:hidden">
-            <ProductCards products={products} />
+            <ProductCards products={displayedProducts} onDeleteClick={setProductToDelete} />
           </div>
 
-          {/* Manual URL-synced Pagination */}
           <Pagination
             total={total}
             page={queryState.page}
@@ -336,6 +362,15 @@ function ProductsContent() {
           />
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        isOpen={!!productToDelete}
+        itemName={productToDelete?.title}
+        isDeleting={isDeleting}
+        onConfirm={handleDeleteConfirm}
+        onCancel={() => setProductToDelete(null)}
+      />
     </main>
   );
 }
