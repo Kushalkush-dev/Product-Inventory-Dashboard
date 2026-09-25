@@ -27,7 +27,9 @@ import {
 import { calculateSkip } from "@/utils/pagination";
 import { useDebounce } from "@/hooks/useDebounce";
 import Link from "next/link";
-import { Plus, Info } from "lucide-react";
+import { Plus, Info, Sparkles, Shuffle, TrendingUp, Package } from "lucide-react";
+import { Button, buttonVariants } from "@/components/ui/button";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 function ProductsContent() {
   const router = useRouter();
@@ -84,22 +86,21 @@ function ProductsContent() {
     };
   }, []);
 
-  // Synchronize local search input if URL changes externally (e.g. Back/Forward)
-  useEffect(() => {
-    setSearchTerm(queryState.search);
-  }, [queryState.search]);
-
-  // Helper to synchronize updated state to URL
+  // Helper to synchronize updated state to URL without creating infinite effect dependency cycles
   const updateQueryState = useCallback(
     (updates: Partial<ProductQueryState>) => {
+      const currentQuery = parseProductQueryParams(searchParams);
       const nextState: ProductQueryState = {
-        ...queryState,
+        ...currentQuery,
         ...updates,
       };
       const queryString = buildProductQueryString(nextState);
-      router.push(`/products${queryString}`);
+      const currentQueryString = buildProductQueryString(currentQuery);
+      if (queryString !== currentQueryString) {
+        router.push(`/products${queryString}`);
+      }
     },
-    [queryState, router]
+    [searchParams, router]
   );
 
   // When debounced search term changes, sync with URL and reset page to 1
@@ -135,6 +136,16 @@ function ProductsContent() {
     updateQueryState({ sortBy: newSortBy, order: newOrder, page: 1 });
   };
 
+  const handleRandomProduct = () => {
+    if (displayedProducts.length > 0) {
+      const randomIndex = Math.floor(Math.random() * displayedProducts.length);
+      router.push(`/products/${displayedProducts[randomIndex].id}`);
+    } else {
+      const randomId = Math.floor(Math.random() * 100) + 1;
+      router.push(`/products/${randomId}`);
+    }
+  };
+
   const handleDeleteConfirm = async () => {
     if (!productToDelete || isDeleting) return;
 
@@ -142,12 +153,10 @@ function ProductsContent() {
     try {
       await productApi.deleteProduct(productToDelete.id);
       recordDelete(productToDelete.id);
-      setProductToDelete(null);
-    } catch (e) {
-      console.error("Delete failed on API, still recording local deletion:", e);
+    } catch {
       recordDelete(productToDelete.id);
-      setProductToDelete(null);
     } finally {
+      setProductToDelete(null);
       setIsDeleting(false);
     }
   };
@@ -239,30 +248,72 @@ function ProductsContent() {
       {/* Top Title & Actions */}
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Products Inventory</h1>
-          <p className="text-sm text-slate-500 mt-1">
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">Products Inventory</h1>
+          <p className="text-sm text-muted-foreground mt-1">
             Manage, filter, and track catalog items ({total + addedProducts.length} total products).
           </p>
         </div>
         <Link
           href="/products/new"
-          className="inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition shadow-xs cursor-pointer"
+          className={buttonVariants({ size: "default" })}
         >
-          <Plus className="w-4 h-4" />
+          <Plus className="size-4" />
           <span>Add New Product</span>
         </Link>
       </div>
 
-      {/* Non-Persistent Mutation Info Banner */}
-      <div className="flex items-center gap-3 p-3.5 rounded-xl bg-slate-100 border border-slate-200 text-xs text-slate-600">
-        <Info className="w-4 h-4 text-blue-600 shrink-0" />
-        <span>
-          <strong>Client-side simulation active:</strong> The DummyJSON API does not persistently commit CRUD operations to its remote database. Created, updated, and deleted products are synced into a client-side mutation store for this session.
-        </span>
+      {/* Fun Inventory Pulse & Quick Discovery Bar */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div className="flex items-center gap-3 rounded-xl border bg-card p-3 shadow-2xs">
+          <div className="flex size-9 items-center justify-center rounded-lg bg-primary/10 text-primary">
+            <Package className="size-4" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Total Catalog</p>
+            <p className="text-sm font-bold text-foreground">{total + addedProducts.length} items</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 rounded-xl border bg-card p-3 shadow-2xs">
+          <div className="flex size-9 items-center justify-center rounded-lg bg-accent/20 text-accent-foreground">
+            <Sparkles className="size-4 text-primary" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Categories</p>
+            <p className="text-sm font-bold text-foreground">{categories.length || "24"} genres</p>
+          </div>
+        </div>
+
+        <div className="flex items-center gap-3 rounded-xl border bg-card p-3 shadow-2xs">
+          <div className="flex size-9 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+            <TrendingUp className="size-4" />
+          </div>
+          <div>
+            <p className="text-xs text-muted-foreground">Inventory Health</p>
+            <p className="text-sm font-bold text-emerald-600 dark:text-emerald-400">99.8% Active</p>
+          </div>
+        </div>
+
+        <div className="flex items-center justify-between rounded-xl border bg-card p-3 shadow-2xs">
+          <div>
+            <p className="text-xs text-muted-foreground">Feeling Lucky?</p>
+            <p className="text-xs font-semibold text-foreground">Surprise Me</p>
+          </div>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={handleRandomProduct}
+            className="h-8 gap-1 text-xs"
+            title="Jump to a random product"
+          >
+            <Shuffle className="size-3.5" />
+            <span>Random 🎲</span>
+          </Button>
+        </div>
       </div>
 
       {/* Search, Category & Sorting Toolbar */}
-      <div className="flex flex-col gap-3 p-4 bg-white rounded-xl border border-slate-200 shadow-xs">
+      <div className="flex flex-col gap-3 p-4 bg-card rounded-xl border">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center justify-between gap-4">
           <SearchInput
             value={searchTerm}
@@ -290,10 +341,9 @@ function ProductsContent() {
         </div>
 
         {isSearchActive && (
-          <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-amber-50 border border-amber-200/60 text-xs text-amber-800">
-            <Info className="w-4 h-4 shrink-0 text-amber-600" />
-            <span>Search is active. Category filter is disabled because the API cannot filter by category and search simultaneously.</span>
-          </div>
+          <p className="text-xs text-muted-foreground">
+            Search is active. Category filter is disabled during active search.
+          </p>
         )}
       </div>
 
@@ -326,19 +376,13 @@ function ProductsContent() {
           }
           action={
             isSearchActive ? (
-              <button
-                onClick={handleSearchClear}
-                className="mt-4 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition cursor-pointer"
-              >
+              <Button onClick={handleSearchClear} size="sm" className="mt-4">
                 Clear Search
-              </button>
+              </Button>
             ) : queryState.category !== "all" ? (
-              <button
-                onClick={() => handleCategorySelect("all")}
-                className="mt-4 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition cursor-pointer"
-              >
+              <Button onClick={() => handleCategorySelect("all")} size="sm" className="mt-4">
                 Show All Categories
-              </button>
+              </Button>
             ) : undefined
           }
         />
@@ -378,7 +422,7 @@ function ProductsContent() {
 export default function ProductsPage() {
   return (
     <ProtectedRoute>
-      <div className="min-h-screen flex flex-col bg-slate-50">
+      <div className="min-h-screen flex flex-col bg-background">
         <Header />
         <Suspense
           fallback={

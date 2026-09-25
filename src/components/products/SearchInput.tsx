@@ -2,6 +2,8 @@
 
 import React from "react";
 import { Search, X, Loader2 } from "lucide-react";
+import { Input } from "@/components/ui/input";
+import { Button } from "@/components/ui/button";
 
 interface SearchInputProps {
   value: string;
@@ -22,31 +24,21 @@ export function SearchInput({
 }: SearchInputProps) {
   return (
     <div className="relative w-full max-w-md">
-      <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
-        <Search className="w-4 h-4" />
-      </div>
-      <input
-        type="text"
+      <Search className="pointer-events-none absolute left-2.5 top-1/2 size-4 -translate-y-1/2 text-muted-foreground" />
+      <Input
         value={value}
         disabled={disabled}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
         aria-label="Search products"
-        className="w-full pl-9 pr-9 py-2 text-sm bg-white border border-slate-200 rounded-lg text-slate-900 placeholder-slate-400 focus:outline-hidden focus:ring-2 focus:ring-blue-100 focus:border-blue-500 transition disabled:opacity-50 disabled:bg-slate-50"
+        className="pl-8 pr-9"
       />
-      <div className="absolute inset-y-0 right-0 pr-2.5 flex items-center gap-1">
-        {isLoading && (
-          <Loader2 className="w-4 h-4 animate-spin text-blue-600" />
-        )}
+      <div className="absolute inset-y-0 right-1.5 flex items-center gap-1">
+        {isLoading && <Loader2 className="size-4 animate-spin text-primary" />}
         {!isLoading && value && (
-          <button
-            type="button"
-            onClick={onClear}
-            className="p-1 text-slate-400 hover:text-slate-600 rounded-md transition cursor-pointer"
-            aria-label="Clear search query"
-          >
-            <X className="w-3.5 h-3.5" />
-          </button>
+          <Button variant="ghost" size="icon-xs" onClick={onClear} aria-label="Clear search">
+            <X className="size-3.5" />
+          </Button>
         )}
       </div>
     </div>

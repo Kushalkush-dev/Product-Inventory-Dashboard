@@ -3,10 +3,14 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from "react";
 import { Product } from "@/types/product";
 
-interface ProductMutationContextType {
+interface ProductContextType {
   addedProducts: Product[];
-  updatedProducts: Record<number, Partial<Product>>;
+  deletedIds: number[];
   deletedProductIds: number[];
+  addProduct: (product: Product) => void;
+  updateProduct: (id: number, updates: Partial<Product>) => void;
+  deleteProduct: (id: number) => void;
+  // Aliases for seamless compatibility
   recordAdd: (product: Product) => void;
   recordUpdate: (id: number, updates: Partial<Product>) => void;
   recordDelete: (id: number) => void;
@@ -14,169 +18,140 @@ interface ProductMutationContextType {
   mergeSingleProduct: (serverProduct: Product) => Product | null;
 }
 
-const LOCAL_STORAGE_MUTATIONS_KEY = "producthub_local_mutations";
+const ProductContext = createContext<ProductContextType | undefined>(undefined);
 
-interface StoredMutations {
-  addedProducts: Product[];
-  updatedProducts: Record<number, Partial<Product>>;
-  deletedProductIds: number[];
-}
-
-const ProductMutationContext = createContext<ProductMutationContextType | undefined>(undefined);
+const ADDED_KEY = "local_added_products";
+const DELETED_KEY = "local_deleted_ids";
+const UPDATED_KEY = "local_updated_products";
 
 export function ProductMutationProvider({ children }: { children: React.ReactNode }) {
   const [addedProducts, setAddedProducts] = useState<Product[]>([]);
+  const [deletedIds, setDeletedIds] = useState<number[]>([]);
   const [updatedProducts, setUpdatedProducts] = useState<Record<number, Partial<Product>>>({});
-  const [deletedProductIds, setDeletedProductIds] = useState<number[]>([]);
 
-  // Restore mutations from localStorage on mount
+  // 1. Load saved products and deletions from localStorage on mount
   useEffect(() => {
     try {
-      const stored = localStorage.getItem(LOCAL_STORAGE_MUTATIONS_KEY);
-      if (stored) {
-        const parsed: StoredMutations = JSON.parse(stored);
-        setAddedProducts(parsed.addedProducts || []);
-        setUpdatedProducts(parsed.updatedProducts || {});
-        setDeletedProductIds(parsed.deletedProductIds || []);
-      }
+      const storedAdded = localStorage.getItem(ADDED_KEY);
+      const storedDeleted = localStorage.getItem(DELETED_KEY);
+      const storedUpdated = localStorage.getItem(UPDATED_KEY);
+
+      const deleted: number[] = storedDeleted ? JSON.parse(storedDeleted) : [];
+      const added: Product[] = storedAdded ? JSON.parse(storedAdded) : [];
+      const updated: Record<number, Partial<Product>> = storedUpdated ? JSON.parse(storedUpdated) : {};
+
+      // Filter added products so any deleted item never appears
+      const cleanAdded = added.filter((p) => !deleted.includes(p.id));
+
+      setDeletedIds(deleted);
+      setAddedProducts(cleanAdded);
+      setUpdatedProducts(updated);
     } catch (e) {
-      console.error("Failed to restore mutation state from localStorage:", e);
+      console.error("Failed to load local products:", e);
     }
   }, []);
 
-  // Save changes to storage whenever mutations change
-  const saveToStorage = (
-    nextAdded: Product[],
-    nextUpdated: Record<number, Partial<Product>>,
-    nextDeleted: number[]
-  ) => {
-    try {
-      const data: StoredMutations = {
-        addedProducts: nextAdded,
-        updatedProducts: nextUpdated,
-        deletedProductIds: nextDeleted,
-      };
-      localStorage.setItem(LOCAL_STORAGE_MUTATIONS_KEY, JSON.stringify(data));
-    } catch (e) {
-      console.error("Failed to persist mutation state:", e);
-    }
-  };
+  // 2. Add product
+  const addProduct = useCallback((product: Product) => {
+    setAddedProducts((prev) => {
+      const updatedList = [product, ...prev.filter((p) => p.id !== product.id)];
+      localStorage.setItem(ADDED_KEY, JSON.stringify(updatedList));
+      return updatedList;
+    });
 
-  const recordAdd = useCallback(
-    (product: Product) => {
-      setAddedProducts((prev) => {
-        // Ensure new additions are placed at the beginning
-        const next = [product, ...prev.filter((p) => p.id !== product.id)];
-        saveToStorage(next, updatedProducts, deletedProductIds);
-        return next;
-      });
-    },
-    [updatedProducts, deletedProductIds]
-  );
+    setDeletedIds((prev) => {
+      const nextDeleted = prev.filter((id) => id !== product.id);
+      localStorage.setItem(DELETED_KEY, JSON.stringify(nextDeleted));
+      return nextDeleted;
+    });
+  }, []);
 
-  const recordUpdate = useCallback(
-    (id: number, updates: Partial<Product>) => {
-      // If this product was locally added, update it in addedProducts directly
-      setAddedProducts((prev) =>
-        prev.map((p) => (p.id === id ? { ...p, ...updates } : p))
-      );
+  // 3. Update product
+  const updateProduct = useCallback((id: number, updates: Partial<Product>) => {
+    setAddedProducts((prev) => {
+      const nextAdded = prev.map((p) => (p.id === id ? { ...p, ...updates } : p));
+      localStorage.setItem(ADDED_KEY, JSON.stringify(nextAdded));
+      return nextAdded;
+    });
 
-      // Also record in updatedProducts for server-originated items
-      setUpdatedProducts((prev) => {
-        const next = {
-          ...prev,
-          [id]: { ...(prev[id] || {}), ...updates },
-        };
-        saveToStorage(addedProducts, next, deletedProductIds);
-        return next;
-      });
-    },
-    [addedProducts, deletedProductIds]
-  );
+    setUpdatedProducts((prev) => {
+      const nextUpdated = { ...prev, [id]: { ...(prev[id] || {}), ...updates } };
+      localStorage.setItem(UPDATED_KEY, JSON.stringify(nextUpdated));
+      return nextUpdated;
+    });
+  }, []);
 
-  const recordDelete = useCallback(
-    (id: number) => {
-      // Remove from local additions if it was added locally
-      setAddedProducts((prev) => prev.filter((p) => p.id !== id));
+  // 4. Delete product
+  const deleteProduct = useCallback((id: number) => {
+    // Remove from added products and save to localStorage
+    setAddedProducts((prev) => {
+      const nextAdded = prev.filter((p) => p.id !== id);
+      localStorage.setItem(ADDED_KEY, JSON.stringify(nextAdded));
+      return nextAdded;
+    });
 
-      // Add to deletedProductIds
-      setDeletedProductIds((prev) => {
-        if (prev.includes(id)) return prev;
-        const next = [...prev, id];
-        saveToStorage(addedProducts, updatedProducts, next);
-        return next;
-      });
-    },
-    [addedProducts, updatedProducts]
-  );
+    // Add to deleted IDs and save to localStorage
+    setDeletedIds((prev) => {
+      const nextDeleted = prev.includes(id) ? prev : [...prev, id];
+      localStorage.setItem(DELETED_KEY, JSON.stringify(nextDeleted));
+      return nextDeleted;
+    });
 
-  /**
-   * Merges server-retrieved products with client-side mutation state:
-   * 1. Exclude items present in deletedProductIds.
-   * 2. Apply field overrides from updatedProducts.
-   * 3. Prepend local additions if on page 1 without search/category filters.
-   */
+    // Remove from updated products
+    setUpdatedProducts((prev) => {
+      const nextUpdated = { ...prev };
+      delete nextUpdated[id];
+      localStorage.setItem(UPDATED_KEY, JSON.stringify(nextUpdated));
+      return nextUpdated;
+    });
+  }, []);
+
+  // 5. Merge server products with local deletions and edits
   const mergeWithServerProducts = useCallback(
     (serverProducts: Product[]): Product[] => {
-      // 1. Filter out deleted products and apply updates
-      const modifiedServerList = serverProducts
-        .filter((prod) => !deletedProductIds.includes(prod.id))
-        .map((prod) => {
-          if (updatedProducts[prod.id]) {
-            return {
-              ...prod,
-              ...updatedProducts[prod.id],
-            };
-          }
-          return prod;
-        });
-
-      return modifiedServerList;
+      return serverProducts
+        .filter((p) => !deletedIds.includes(p.id))
+        .map((p) => (updatedProducts[p.id] ? { ...p, ...updatedProducts[p.id] } : p));
     },
-    [deletedProductIds, updatedProducts]
+    [deletedIds, updatedProducts]
   );
 
-  /**
-   * Merges a single product (e.g. for /products/[id]) with local updates or returns null if deleted
-   */
+  // 6. Merge single product (for detail and edit pages)
   const mergeSingleProduct = useCallback(
     (serverProduct: Product): Product | null => {
-      if (deletedProductIds.includes(serverProduct.id)) {
-        return null;
-      }
-      if (updatedProducts[serverProduct.id]) {
-        return {
-          ...serverProduct,
-          ...updatedProducts[serverProduct.id],
-        };
-      }
-      return serverProduct;
+      if (deletedIds.includes(serverProduct.id)) return null;
+      return updatedProducts[serverProduct.id]
+        ? { ...serverProduct, ...updatedProducts[serverProduct.id] }
+        : serverProduct;
     },
-    [deletedProductIds, updatedProducts]
+    [deletedIds, updatedProducts]
   );
 
   return (
-    <ProductMutationContext.Provider
+    <ProductContext.Provider
       value={{
         addedProducts,
-        updatedProducts,
-        deletedProductIds,
-        recordAdd,
-        recordUpdate,
-        recordDelete,
+        deletedIds,
+        deletedProductIds: deletedIds,
+        addProduct,
+        updateProduct,
+        deleteProduct,
+        recordAdd: addProduct,
+        recordUpdate: updateProduct,
+        recordDelete: deleteProduct,
         mergeWithServerProducts,
         mergeSingleProduct,
       }}
     >
       {children}
-    </ProductMutationContext.Provider>
+    </ProductContext.Provider>
   );
 }
 
 export function useProductMutations() {
-  const context = useContext(ProductMutationContext);
+  const context = useContext(ProductContext);
   if (!context) {
-    throw new Error("useProductMutations must be used within a ProductMutationProvider");
+    throw new Error("useProductMutations must be used within ProductMutationProvider");
   }
   return context;
 }

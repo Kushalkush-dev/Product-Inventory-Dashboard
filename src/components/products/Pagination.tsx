@@ -4,6 +4,8 @@ import React from "react";
 import { ChevronLeft, ChevronRight, MoreHorizontal } from "lucide-react";
 import { AllowedLimit, ALLOWED_LIMITS } from "@/utils/urlParams";
 import { getPaginationInfo } from "@/utils/pagination";
+import { Button } from "@/components/ui/button";
+import { Select, SelectTrigger, SelectValue, SelectContent, SelectItem } from "@/components/ui/select";
 
 interface PaginationProps {
   total: number;
@@ -14,104 +16,60 @@ interface PaginationProps {
   disabled?: boolean;
 }
 
-export function Pagination({
-  total,
-  page,
-  limit,
-  onPageChange,
-  onLimitChange,
-  disabled = false,
-}: PaginationProps) {
+export function Pagination({ total, page, limit, onPageChange, onLimitChange, disabled = false }: PaginationProps) {
   const info = getPaginationInfo(total, page, limit);
 
   return (
-    <div className="flex flex-col sm:flex-row items-center justify-between gap-4 py-4 border-t border-slate-200">
-      {/* Showing X–Y of Z and Limit Selector */}
-      <div className="flex flex-wrap items-center gap-3 text-xs sm:text-sm text-slate-600">
+    <div className="flex flex-col items-center justify-between gap-4 border-t py-4 sm:flex-row">
+      {/* Summary + limit selector */}
+      <div className="flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
         <span>
-          Showing <strong className="text-slate-900">{info.startItem}</strong>–
-          <strong className="text-slate-900">{info.endItem}</strong> of{" "}
-          <strong className="text-slate-900">{info.total}</strong> products
+          Showing <strong className="text-foreground">{info.startItem}</strong>–
+          <strong className="text-foreground">{info.endItem}</strong> of{" "}
+          <strong className="text-foreground">{info.total}</strong>
         </span>
 
-        <div className="flex items-center gap-1.5 pl-3 border-l border-slate-200">
-          <label htmlFor="limit-select" className="text-xs text-slate-500">
-            Per page:
-          </label>
-          <select
-            id="limit-select"
-            value={limit}
-            disabled={disabled}
-            onChange={(e) => onLimitChange(Number(e.target.value) as AllowedLimit)}
-            className="px-2 py-1 rounded-md border border-slate-200 bg-white text-xs font-medium text-slate-700 focus:outline-hidden focus:ring-2 focus:ring-blue-100 cursor-pointer disabled:opacity-50"
-          >
+        <Select value={String(limit)} onValueChange={(v) => onLimitChange(Number(v) as AllowedLimit)} disabled={disabled}>
+          <SelectTrigger className="w-[70px]" aria-label="Items per page">
+            <SelectValue />
+          </SelectTrigger>
+          <SelectContent>
             {ALLOWED_LIMITS.map((size) => (
-              <option key={size} value={size}>
-                {size}
-              </option>
+              <SelectItem key={size} value={String(size)}>{size}</SelectItem>
             ))}
-          </select>
-        </div>
+          </SelectContent>
+        </Select>
       </div>
 
-      {/* Navigation Buttons and Page Numbers */}
+      {/* Page buttons */}
       <div className="flex items-center gap-1">
-        {/* Previous Button */}
-        <button
-          onClick={() => onPageChange(info.page - 1)}
-          disabled={!info.hasPrev || disabled}
-          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-          aria-label="Previous Page"
-        >
-          <ChevronLeft className="w-4 h-4" />
+        <Button variant="outline" size="sm" onClick={() => onPageChange(info.page - 1)} disabled={!info.hasPrev || disabled} aria-label="Previous">
+          <ChevronLeft />
           <span className="hidden sm:inline">Previous</span>
-        </button>
+        </Button>
 
-        {/* Page Sequence */}
-        <div className="flex items-center gap-1 px-1">
-          {info.pageNumbers.map((num, idx) => {
-            if (num === "ellipsis") {
-              return (
-                <span
-                  key={`ellipsis-${idx}`}
-                  className="px-2 py-1 text-slate-400 select-none"
-                  aria-hidden="true"
-                >
-                  <MoreHorizontal className="w-4 h-4" />
-                </span>
-              );
-            }
+        {info.pageNumbers.map((num, idx) =>
+          num === "ellipsis" ? (
+            <span key={`e-${idx}`} className="px-2 text-muted-foreground"><MoreHorizontal className="size-4" /></span>
+          ) : (
+            <Button
+              key={num}
+              variant={num === info.page ? "default" : "ghost"}
+              size="icon-sm"
+              onClick={() => onPageChange(num)}
+              disabled={disabled}
+              aria-current={num === info.page ? "page" : undefined}
+              aria-label={`Page ${num}`}
+            >
+              {num}
+            </Button>
+          )
+        )}
 
-            const isCurrent = num === info.page;
-            return (
-              <button
-                key={num}
-                onClick={() => onPageChange(num)}
-                disabled={disabled}
-                className={`min-w-8 h-8 px-2 rounded-lg text-xs sm:text-sm font-semibold transition cursor-pointer ${
-                  isCurrent
-                    ? "bg-blue-600 text-white shadow-xs"
-                    : "text-slate-700 hover:bg-slate-100 disabled:opacity-50"
-                }`}
-                aria-current={isCurrent ? "page" : undefined}
-                aria-label={`Page ${num}`}
-              >
-                {num}
-              </button>
-            );
-          })}
-        </div>
-
-        {/* Next Button */}
-        <button
-          onClick={() => onPageChange(info.page + 1)}
-          disabled={!info.hasNext || disabled}
-          className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-slate-200 bg-white text-xs sm:text-sm font-medium text-slate-700 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition cursor-pointer"
-          aria-label="Next Page"
-        >
+        <Button variant="outline" size="sm" onClick={() => onPageChange(info.page + 1)} disabled={!info.hasNext || disabled} aria-label="Next">
           <span className="hidden sm:inline">Next</span>
-          <ChevronRight className="w-4 h-4" />
-        </button>
+          <ChevronRight />
+        </Button>
       </div>
     </div>
   );

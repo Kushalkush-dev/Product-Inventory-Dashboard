@@ -1,12 +1,18 @@
 import type { Metadata } from "next";
-import { Inter } from "next/font/google";
+import { Montserrat, Fira_Code } from "next/font/google";
 import "./globals.css";
 import { AuthProvider } from "@/context/AuthContext";
 import { ProductMutationProvider } from "@/context/ProductMutationContext";
+import { ThemeProvider } from "@/components/theme-provider";
 
-const inter = Inter({
+const fontSans = Montserrat({
   subsets: ["latin"],
-  variable: "--font-inter",
+  variable: "--font-sans",
+});
+
+const fontMono = Fira_Code({
+  subsets: ["latin"],
+  variable: "--font-mono",
 });
 
 export const metadata: Metadata = {
@@ -20,13 +26,21 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en" className={`${inter.variable} h-full antialiased`}>
-      <body className="min-h-full flex flex-col font-sans bg-slate-50 text-slate-900">
-        <AuthProvider>
-          <ProductMutationProvider>
-            {children}
-          </ProductMutationProvider>
-        </AuthProvider>
+    <html lang="en" className={`${fontSans.variable} ${fontMono.variable} antialiased`} suppressHydrationWarning>
+      <body className="min-h-full flex flex-col bg-background text-foreground font-sans" suppressHydrationWarning>
+        <ThemeProvider
+          attribute="class"
+          defaultTheme="system"
+          enableSystem
+          storageKey="producthub_theme"
+          disableTransitionOnChange
+        >
+          <AuthProvider>
+            <ProductMutationProvider>
+              {children}
+            </ProductMutationProvider>
+          </AuthProvider>
+        </ThemeProvider>
       </body>
     </html>
   );

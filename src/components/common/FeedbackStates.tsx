@@ -1,5 +1,6 @@
-import React from "react";
 import { AlertCircle, RefreshCw } from "lucide-react";
+import { Alert, AlertTitle, AlertDescription } from "@/components/ui/alert";
+import { Button } from "@/components/ui/button";
 
 interface ErrorStateProps {
   title?: string;
@@ -15,22 +16,18 @@ export function ErrorState({
   isRetrying = false,
 }: ErrorStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center p-8 sm:p-12 text-center bg-white rounded-2xl border border-red-100 shadow-xs max-w-lg mx-auto my-8">
-      <div className="p-3 bg-red-50 text-red-600 rounded-full mb-4">
-        <AlertCircle className="w-8 h-8" />
-      </div>
-      <h3 className="text-lg font-bold text-slate-900 mb-1">{title}</h3>
-      <p className="text-sm text-slate-500 mb-6 leading-relaxed">{message}</p>
-      {onRetry && (
-        <button
-          onClick={onRetry}
-          disabled={isRetrying}
-          className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 text-white text-sm font-medium hover:bg-blue-700 transition disabled:opacity-50 cursor-pointer shadow-xs"
-        >
-          <RefreshCw className={`w-4 h-4 ${isRetrying ? "animate-spin" : ""}`} />
-          {isRetrying ? "Retrying..." : "Retry"}
-        </button>
-      )}
+    <div className="mx-auto my-8 max-w-lg">
+      <Alert variant="destructive" className="flex flex-col items-center p-8 text-center">
+        <AlertCircle className="mb-2 size-8" />
+        <AlertTitle className="text-lg">{title}</AlertTitle>
+        <AlertDescription className="mb-4">{message}</AlertDescription>
+        {onRetry && (
+          <Button onClick={onRetry} disabled={isRetrying} size="sm">
+            <RefreshCw className={isRetrying ? "animate-spin" : ""} />
+            {isRetrying ? "Retrying..." : "Retry"}
+          </Button>
+        )}
+      </Alert>
     </div>
   );
 }
@@ -47,13 +44,13 @@ export function EmptyState({
   action,
 }: EmptyStateProps) {
   return (
-    <div className="flex flex-col items-center justify-center p-12 text-center bg-white rounded-2xl border border-slate-200 shadow-xs max-w-lg mx-auto my-8">
-      <div className="w-16 h-16 bg-slate-50 border border-slate-200/80 rounded-2xl flex items-center justify-center text-slate-400 mb-4">
-        <span className="text-2xl">📦</span>
+    <div className="mx-auto my-8 max-w-lg rounded-xl border bg-card p-12 text-center">
+      <div className="mx-auto mb-4 flex size-16 items-center justify-center rounded-2xl border bg-muted text-2xl">
+        📦
       </div>
-      <h3 className="text-lg font-bold text-slate-900 mb-1">{title}</h3>
-      <p className="text-sm text-slate-500 mb-6 leading-relaxed">{message}</p>
-      {action && <div>{action}</div>}
+      <h3 className="mb-1 text-lg font-bold">{title}</h3>
+      <p className="mb-4 text-sm text-muted-foreground">{message}</p>
+      {action}
     </div>
   );
 }

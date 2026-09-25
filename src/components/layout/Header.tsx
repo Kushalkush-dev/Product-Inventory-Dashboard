@@ -4,7 +4,18 @@ import React from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { Package, LogOut, User as UserIcon, Plus } from "lucide-react";
+import { Package, LogOut, Plus, ChevronDown } from "lucide-react";
+import { buttonVariants } from "@/components/ui/button";
+import { Avatar, AvatarImage, AvatarFallback } from "@/components/ui/avatar";
+import {
+  DropdownMenu,
+  DropdownMenuTrigger,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu";
+import { ThemeToggle } from "./ThemeToggle";
 
 export function Header() {
   const { user, logout } = useAuth();
@@ -16,66 +27,81 @@ export function Header() {
   };
 
   return (
-    <header className="sticky top-0 z-30 w-full bg-white/80 backdrop-blur-md border-b border-slate-200">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 h-16 flex items-center justify-between">
+    <header className="sticky top-0 z-30 w-full border-b bg-background/80 backdrop-blur-md">
+      <div className="mx-auto flex h-14 max-w-7xl items-center justify-between px-4 sm:px-6 lg:px-8">
         <div className="flex items-center gap-6">
-          <Link href="/products" className="flex items-center gap-2 font-bold text-lg text-slate-900">
-            <div className="p-1.5 rounded-lg bg-blue-600 text-white shadow-xs">
-              <Package className="w-5 h-5" />
+          <Link href="/products" className="flex items-center gap-2 text-lg font-bold">
+            <div className="rounded-lg bg-primary p-1.5 text-primary-foreground">
+              <Package className="size-5" />
             </div>
-            <span>ProductHub</span>
+            ProductHub
           </Link>
-          <nav className="hidden md:flex items-center gap-4 text-sm font-medium">
-            <Link
-              href="/products"
-              className="text-slate-700 hover:text-blue-600 transition"
-            >
+          <nav className="hidden items-center gap-4 text-sm font-medium md:flex">
+            <Link href="/products" className="text-muted-foreground hover:text-foreground transition">
               Inventory
             </Link>
           </nav>
         </div>
 
         <div className="flex items-center gap-3">
-          <Link
-            href="/products/new"
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-blue-600 text-white text-xs sm:text-sm font-medium hover:bg-blue-700 transition shadow-xs"
-          >
-            <Plus className="w-4 h-4" />
+          <ThemeToggle />
+
+          <Link href="/products/new" className={buttonVariants({ size: "sm" })}>
+            <Plus className="size-4" />
             <span className="hidden sm:inline">Add Product</span>
           </Link>
 
           {user && (
-            <div className="flex items-center gap-3 pl-3 border-l border-slate-200">
-              <div className="flex items-center gap-2">
-                {user.image ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img
-                    src={user.image}
-                    alt={user.firstName}
-                    className="w-8 h-8 rounded-full border border-slate-200 object-cover"
-                  />
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-slate-100 flex items-center justify-center text-slate-600">
-                    <UserIcon className="w-4 h-4" />
-                  </div>
-                )}
-                <div className="hidden lg:block text-left">
-                  <p className="text-xs font-semibold text-slate-800 leading-tight">
-                    {user.firstName} {user.lastName}
-                  </p>
-                  <p className="text-[11px] text-slate-500 leading-tight">@{user.username}</p>
-                </div>
-              </div>
+            <div className="flex items-center border-l pl-3">
+              <DropdownMenu>
+                <DropdownMenuTrigger
+                  aria-label="User menu"
+                  className="flex items-center gap-2 rounded-lg p-1 text-left transition hover:bg-muted/60 outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+                >
+                  <Avatar size="default" className="size-8">
+                    {user.image ? (
+                      <AvatarImage src={user.image} alt={user.firstName} />
+                    ) : null}
+                    <AvatarFallback className="text-xs">
+                      {user.firstName?.[0]}
+                      {user.lastName?.[0]}
+                    </AvatarFallback>
+                  </Avatar>
 
-              <button
-                onClick={handleLogout}
-                className="inline-flex items-center gap-1.5 p-2 rounded-lg text-slate-500 hover:text-red-600 hover:bg-red-50 transition text-xs font-medium cursor-pointer"
-                title="Logout"
-                aria-label="Logout"
-              >
-                <LogOut className="w-4 h-4" />
-                <span className="hidden sm:inline">Logout</span>
-              </button>
+                  <div className="hidden text-left sm:block">
+                    <p className="text-xs font-semibold leading-tight">
+                      {user.firstName} {user.lastName}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground leading-tight">
+                      @{user.username}
+                    </p>
+                  </div>
+
+                  <ChevronDown className="size-3.5 text-muted-foreground transition-transform" />
+                </DropdownMenuTrigger>
+
+                <DropdownMenuContent align="end" className="w-48">
+                  <DropdownMenuLabel className="space-y-0.5">
+                    <p className="font-semibold text-xs text-foreground">
+                      {user.firstName} {user.lastName}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground font-normal">
+                      @{user.username}
+                    </p>
+                  </DropdownMenuLabel>
+
+                  <DropdownMenuSeparator />
+
+                  <DropdownMenuItem
+                    onClick={handleLogout}
+                    variant="destructive"
+                    className="cursor-pointer gap-2"
+                  >
+                    <LogOut className="size-4" />
+                    <span>Logout</span>
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </div>
           )}
         </div>
