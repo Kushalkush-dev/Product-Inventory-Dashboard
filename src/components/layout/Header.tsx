@@ -34,7 +34,7 @@ export function Header() {
             <div className="rounded-lg bg-primary p-1.5 text-primary-foreground">
               <Package className="size-5" />
             </div>
-            ProductHub
+            StockPulse
           </Link>
           <nav className="hidden items-center gap-4 text-sm font-medium md:flex">
             <Link href="/products" className="text-muted-foreground hover:text-foreground transition">

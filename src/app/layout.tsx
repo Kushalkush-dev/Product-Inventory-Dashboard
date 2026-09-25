@@ -16,7 +16,7 @@ const fontMono = Fira_Code({
 });
 
 export const metadata: Metadata = {
-  title: "ProductHub | Modern Product Management Dashboard",
+  title: "StockPulse | Modern Product Management Dashboard",
   description: "Production-ready product management dashboard with real-time filters, search, and inventory tracking.",
 };
 

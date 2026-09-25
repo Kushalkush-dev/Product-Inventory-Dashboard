@@ -62,7 +62,7 @@ export default function LoginPage() {
           <div className="inline-flex rounded-xl bg-primary p-2.5 text-primary-foreground">
             <PackageCheck className="size-6" />
           </div>
-          <h1 className="text-2xl font-bold tracking-tight">ProductHub</h1>
+          <h1 className="text-2xl font-bold tracking-tight">StockPulse</h1>
           <p className="text-xs text-muted-foreground">Sign in to manage your inventory</p>
         </div>
 
