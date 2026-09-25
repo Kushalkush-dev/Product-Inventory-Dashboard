@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { ThemeToggle } from "@/components/layout/ThemeToggle";
+import { GithubIcon } from "@/components/common/GithubIcon";
 
 export default function Home() {
   return (
@@ -26,6 +27,22 @@ export default function Home() {
           </div>
 
           <div className="flex items-center gap-3">
+            <a
+              href="https://github.com/Kushalkush-dev/Product-Inventory-Dashboard"
+              target="_blank"
+              rel="noopener noreferrer"
+              className={buttonVariants({
+                variant: "ghost",
+                size: "sm",
+                className: "h-8 px-2 text-muted-foreground hover:text-foreground gap-1.5",
+              })}
+              title="View on GitHub"
+              aria-label="GitHub Repository"
+            >
+              <GithubIcon className="size-4" />
+              <span className="hidden sm:inline text-xs font-medium">GitHub</span>
+            </a>
+
             <ThemeToggle />
             <Link
               href="/login"
