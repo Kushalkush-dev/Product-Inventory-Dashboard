@@ -61,8 +61,24 @@ export const productApi = {
    * Fetches a single product by ID.
    */
   getProductById: async (id: number | string, signal?: AbortSignal): Promise<Product> => {
-    const response = await apiClient.get<Product>(`/products/${id}`, { signal });
-    return response.data;
+    try {
+      const response = await apiClient.get<Product>(`/products/${id}`, { signal });
+      return response.data;
+    } catch (err: unknown) {
+      if (typeof window !== "undefined") {
+        try {
+          const stored = localStorage.getItem("local_added_products");
+          if (stored) {
+            const added: Product[] = JSON.parse(stored);
+            const found = added.find((p) => String(p.id) === String(id));
+            if (found) return found;
+          }
+        } catch {
+          // Fall through to throw
+        }
+      }
+      throw err;
+    }
   },
 
   /**
